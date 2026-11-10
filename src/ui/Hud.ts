@@ -35,6 +35,7 @@ export class Hud {
   private toastEl: HTMLElement;
   private overlay: HTMLElement;
   private flashEl: HTMLElement;
+  private flashState: { start: number; ms: number; opacity: number } | null = null;
   private objectiveTimer = 0;
   private toastTimer = 0;
 
@@ -77,13 +78,18 @@ export class Hud {
 
   /** Full-screen flash (jumpscares). */
   flash(color: string, ms: number, opacity = 1): void {
-    const f = this.flashEl;
-    f.style.transition = 'none';
-    f.style.background = color;
-    f.style.opacity = String(opacity);
-    void f.offsetWidth;
-    f.style.transition = `opacity ${ms}ms ease-out`;
-    f.style.opacity = '0';
+    this.flashEl.style.background = color;
+    this.flashState = { start: timers.now(), ms, opacity };
+    this.tick();
+  }
+
+  /** Per-frame: fades the flash on the game clock (works in offline capture too). */
+  tick(): void {
+    const f = this.flashState;
+    if (!f) return;
+    const k = Math.min(1, (timers.now() - f.start) / f.ms);
+    this.flashEl.style.opacity = String(f.opacity * (1 - k) * (1 - k));
+    if (k >= 1) this.flashState = null;
   }
 
   toast(text: string, ms = 2200): void {

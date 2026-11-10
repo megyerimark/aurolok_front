@@ -7,7 +7,7 @@ import { SimWorld } from '../sim/SimWorld';
 import { buildIncidentReport } from '../sim/story/IncidentReport';
 import { Hud } from '../ui/Hud';
 import { RadioUI } from '../ui/RadioUI';
-import { AudioManager } from './AudioManager';
+import { AudioManager, renderWavBase64 } from './AudioManager';
 import { buildLevel, type DoorView, type Level } from './LevelBuilder';
 import { LightPool } from './LightPool';
 import { NpcView } from './NpcView';
@@ -107,6 +107,7 @@ export class Game {
 
     this.hud.showTitle(() => this.begin());
     (window as unknown as { __game: Game }).__game = this;
+    (window as unknown as { __audio: unknown }).__audio = { AudioManager, renderWavBase64 };
     this.loop();
   }
 
@@ -142,6 +143,7 @@ export class Game {
     this.time += dt;
     if (this.running && !this.ended && !this.hud.overlayOpen) this.update(dt);
     this.updateVisuals(dt);
+    this.hud.tick();
     this.renderer.draw(this.time);
   }
 
@@ -607,6 +609,12 @@ export class Game {
   }
 
   /** Test hook: advance the simulation by fixed steps, independent of frame rate. */
+  /** Capture: route all audio into another AudioManager (e.g. an offline one). */
+  debugUseAudio(mgr: AudioManager): void {
+    this.audio = mgr;
+    (this.scares as unknown as { audio: AudioManager }).audio = mgr;
+  }
+
   debugScare(kind: Parameters<ScareController['force']>[0]): void {
     this.scares.force(kind);
   }

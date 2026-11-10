@@ -39,7 +39,13 @@ export const AUDIO_CUES = {
 export type CueId = keyof typeof AUDIO_CUES;
 
 export class AudioManager {
-  readonly ctx: AudioContext;
+  readonly ctx: BaseAudioContext;
+  /**
+   * Current audio time. Real time normally; for offline rendering (video
+   * capture) it is set to the game's clock so every cue lands on its frame.
+   */
+  now: () => number = () => this.ctx.currentTime;
+  readonly offline: boolean;
   private master: GainNode;
   private sfx: GainNode;
   private amb: GainNode;
@@ -52,8 +58,9 @@ export class AudioManager {
   private dread: GainNode | null = null;
   private dreadFilter: BiquadFilterNode | null = null;
 
-  constructor() {
-    this.ctx = new AudioContext();
+  constructor(ctx?: BaseAudioContext) {
+    this.ctx = ctx ?? new AudioContext();
+    this.offline = typeof OfflineAudioContext !== 'undefined' && this.ctx instanceof OfflineAudioContext;
     this.master = this.ctx.createGain();
     this.master.gain.value = 0.9;
     const comp = this.ctx.createDynamicsCompressor();
@@ -64,18 +71,18 @@ export class AudioManager {
     this.amb = this.bus(0.8);
     this.radio = this.radioChain();
     this.noiseBuf = this.makeNoise(3);
-    void this.loadSamples();
+    if (!this.offline) void this.loadSamples();
   }
 
   resume(): void {
-    void this.ctx.resume();
+    if (this.ctx instanceof AudioContext) void this.ctx.resume();
   }
 
   /** Listener follows the camera. */
   updateListener(cam: THREE.Camera): void {
     const l = this.ctx.listener;
     const p = cam.position;
-    const t = this.ctx.currentTime;
+    const t = this.now();
     const fwd = { x: -Math.sin(cam.rotation.y), z: -Math.cos(cam.rotation.y) };
     if (l.positionX) {
       l.positionX.setTargetAtTime(p.x, t, 0.02);
@@ -184,14 +191,14 @@ export class AudioManager {
   /** 0..1. The dread bed swells and the "wind" opens up as dread rises. */
   setDread(level: number): void {
     if (!this.dread || !this.dreadFilter) return;
-    const t = this.ctx.currentTime;
+    const t = this.now();
     this.dread.gain.setTargetAtTime(Math.pow(level, 1.4) * 0.55, t, 0.8);
     this.dreadFilter.Q.setTargetAtTime(2 + level * 10, t, 1);
   }
 
   /** Power state drives the hum. Losing power = sudden silence. */
   setPower(online: boolean): void {
-    const t = this.ctx.currentTime;
+    const t = this.now();
     this.roomTone?.gain.setTargetAtTime(online ? 1 : 0.04, t, online ? 0.6 : 0.08);
     this.generator?.gain.gain.setTargetAtTime(online ? 0.5 : 0, t, online ? 1.2 : 0.5);
     this.play(online ? 'sfx.power_up' : 'sfx.power_down');
@@ -200,14 +207,14 @@ export class AudioManager {
   /** 0..1 breathing loudness; cycles in and out. */
   setBreathing(level: number): void {
     if (!this.breath) return;
-    const cycle = 0.5 + 0.5 * Math.sin(this.ctx.currentTime * 3.2);
-    this.breath.gain.setTargetAtTime(level * 0.12 * cycle, this.ctx.currentTime, 0.05);
+    const cycle = 0.5 + 0.5 * Math.sin(this.now() * 3.2);
+    this.breath.gain.setTargetAtTime(level * 0.12 * cycle, this.now(), 0.05);
   }
 
   // ------------------------------------------------------------------ one-shots
 
   play(id: CueId, opts: { pos?: Vec2; y?: number; gain?: number; open?: boolean; duration?: number; intensity?: number } = {}): void {
-    if (this.ctx.state !== 'running') return;
+    if (this.ctx.state !== 'running' && !this.offline) return;
     const out = this.ctx.createGain();
     out.gain.value = opts.gain ?? 1;
     const dest = id.startsWith('radio.') ? this.radio : this.sfx;
@@ -229,7 +236,7 @@ export class AudioManager {
   // ------------------------------------------------------------------ synth placeholders
 
   private synth(id: CueId, out: GainNode, opts: { open?: boolean; duration?: number; intensity?: number }): void {
-    const t = this.ctx.currentTime;
+    const t = this.now();
     const c = this.ctx;
     switch (id) {
       case 'sfx.footstep': {
@@ -613,4 +620,32 @@ export class AudioManager {
       }
     }
   }
+}
+
+/** Renders an offline AudioManager's output to a 16-bit stereo WAV (base64). */
+export async function renderWavBase64(ctx: OfflineAudioContext): Promise<string> {
+  const buf = await ctx.startRendering();
+  const ch = [buf.getChannelData(0), buf.getChannelData(buf.numberOfChannels > 1 ? 1 : 0)];
+  const n = buf.length;
+  const out = new DataView(new ArrayBuffer(44 + n * 4));
+  const str = (o: number, t: string) => [...t].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF');
+  out.setUint32(4, 36 + n * 4, true);
+  str(8, 'WAVEfmt ');
+  out.setUint32(16, 16, true);
+  out.setUint16(20, 1, true);
+  out.setUint16(22, 2, true);
+  out.setUint32(24, buf.sampleRate, true);
+  out.setUint32(28, buf.sampleRate * 4, true);
+  out.setUint16(32, 4, true);
+  out.setUint16(34, 16, true);
+  str(36, 'data');
+  out.setUint32(40, n * 4, true);
+  for (let i = 0; i < n; i++) {
+    for (let c = 0; c < 2; c++) out.setInt16(44 + i * 4 + c * 2, Math.max(-1, Math.min(1, ch[c][i])) * 0x7fff, true);
+  }
+  const bytes = new Uint8Array(out.buffer);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
 }
