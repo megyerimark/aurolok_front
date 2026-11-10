@@ -25,7 +25,6 @@ export class MonsterView {
   constructor() {
     const skin = new THREE.MeshStandardMaterial({ color: 0x9a978c, roughness: 0.65, metalness: 0 });
     const coat = new THREE.MeshStandardMaterial({ color: 0x4a4740, roughness: 0.95, side: THREE.DoubleSide });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x050403, roughness: 1 });
 
     const capsule = (r: number, len: number, mat: THREE.Material) => {
       const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 10), mat);
@@ -117,7 +116,7 @@ export class MonsterView {
     skull.rotation.y = -Math.PI / 2; // perforated side of the texture faces forward
     skull.castShadow = true;
     this.head.add(skull);
-    const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), dark);
+    const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshBasicMaterial({ color: 0x000000 })); // a hole, never lit
     mouth.scale.set(0.7, 1.6, 0.4);
     mouth.position.set(0, -0.07, 0.115);
     this.head.add(mouth);
