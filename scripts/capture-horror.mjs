@@ -191,3 +191,4 @@ execFileSync('ffmpeg', [
   '-c:v', 'libx264', '-crf', '20', '-preset', 'medium', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', OUT,
 ]);
 console.log(`wrote ${OUT} (${seconds.toFixed(1)}s)`);
+process.exit(0);
