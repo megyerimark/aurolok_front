@@ -1,3 +1,4 @@
+import { timers } from '../core/Timers';
 import * as THREE from 'three';
 import { CEILING, cellToWorld, type RoomId } from '../sim/facility/FacilityMap';
 import { doorCenter, roomName } from '../sim/facility/FacilityState';
@@ -129,12 +130,16 @@ export class Game {
 
   private loop = (): void => {
     requestAnimationFrame(this.loop);
-    const dt = Math.min(this.clock.getDelta(), 0.05);
+    if (timers.manual) return; // frames are driven by debugFrame()
+    this.frame(Math.min(this.clock.getDelta(), 0.05));
+  };
+
+  private frame(dt: number): void {
     this.time += dt;
     if (this.running && !this.ended && !this.hud.overlayOpen) this.update(dt);
     this.updateVisuals(dt);
     this.renderer.draw(this.time);
-  };
+  }
 
   private update(dt: number): void {
     const sim = this.sim;
@@ -311,7 +316,7 @@ export class Game {
   private transmit(to: string, cmd: CommandId): void {
     this.audio.play('radio.squelch', { open: true });
     this.sim.transmit(to, cmd);
-    setTimeout(() => this.audio.play('radio.squelch', { open: false }), 450);
+    timers.after(450, () => this.audio.play('radio.squelch', { open: false }));
   }
 
   // ------------------------------------------------------------------ sim events -> presentation
@@ -363,7 +368,7 @@ export class Game {
     bus.on('shiftEnded', (e) => {
       this.ended = true;
       document.exitPointerLock?.();
-      setTimeout(() => this.hud.showReport(buildIncidentReport(this.sim), e.reason, () => location.reload()), 1200);
+      timers.after(1200, () => this.hud.showReport(buildIncidentReport(this.sim), e.reason, () => location.reload()));
     });
   }
 
@@ -549,6 +554,25 @@ export class Game {
     this.player.yaw = yaw;
     this.player.pitch = pitch;
     this.player.update(0, { forward: 0, right: 0, sprint: false, crouch: false });
+  }
+
+  /**
+   * Offline capture: switch to manual frames. Each call renders one frame of
+   * exactly `dt` seconds with the given keys held, so a video can be rendered
+   * at a fixed frame rate however slow the machine is.
+   */
+  debugFrame(dt: number, held: string[] = [], look: [number, number] = [0, 0]): void {
+    timers.manual = true;
+    this.keys = new Set(held);
+    if (look[0] || look[1]) this.player.look(look[0], look[1]);
+    timers.advance(dt * 1000);
+    this.frame(dt);
+  }
+
+  /** Test hook: press a key once (radio, flashlight, interact). */
+  debugKey(code: string): void {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { code }));
   }
 
   /** Test hook: advance the simulation by fixed steps, independent of frame rate. */

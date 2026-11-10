@@ -1,3 +1,4 @@
+import { timers } from '../core/Timers';
 import * as THREE from 'three';
 import type { NpcAgent } from '../sim/npc/NpcAgent';
 
@@ -112,13 +113,13 @@ export class NpcView {
     for (const leg of this.legs) leg.rotation.x += hiding ? -1.1 : 0;
     const hunch = Math.min(0.5, a.fear * 0.45) + (hiding ? 0.4 : 0) + (a.state === 'PerformingTask' ? 0.35 : 0);
     this.torso.rotation.x += (hunch - this.torso.rotation.x) * Math.min(1, dt * 4);
-    const breathe = Math.sin(performance.now() * 0.002 * (1 + a.fear * 2)) * 0.008;
+    const breathe = Math.sin(timers.now() * 0.002 * (1 + a.fear * 2)) * 0.008;
     this.torso.position.y = breathe;
     if (a.state === 'PerformingTask') {
-      this.arms[0].rotation.x = -1.1 + Math.sin(this.phase + performance.now() * 0.006) * 0.15;
+      this.arms[0].rotation.x = -1.1 + Math.sin(this.phase + timers.now() * 0.006) * 0.15;
       this.arms[1].rotation.x = -1.0;
     }
-    if (a.state === 'Investigating' || a.state === 'Suspicious') this.head.rotation.y = Math.sin(performance.now() * 0.0012) * 0.6;
+    if (a.state === 'Investigating' || a.state === 'Suspicious') this.head.rotation.y = Math.sin(timers.now() * 0.0012) * 0.6;
     else this.head.rotation.y *= 0.9;
 
     const torchOn = darkness > 0.6 && !hiding;

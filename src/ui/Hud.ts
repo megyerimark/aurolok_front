@@ -1,3 +1,4 @@
+import { timers } from '../core/Timers';
 import type { RadioMessage } from '../sim/radio/RadioSystem';
 import { formatTime, type IncidentReport } from '../sim/story/IncidentReport';
 import type { HistoryEntry } from '../core/EventHistory';
@@ -61,8 +62,8 @@ export class Hud {
   setObjective(text: string): void {
     this.objective.innerHTML = `<span class="label">OBJECTIVE</span>${esc(text)}`;
     this.objective.className = 'objective fresh';
-    clearTimeout(this.objectiveTimer);
-    this.objectiveTimer = window.setTimeout(() => (this.objective.className = 'objective stale'), 9000);
+    const token = ++this.objectiveTimer;
+    timers.after(9000, () => token === this.objectiveTimer && (this.objective.className = 'objective stale'));
   }
 
   setInventory(charge: number, batteries: number, keycard: boolean): void {
@@ -75,8 +76,8 @@ export class Hud {
   toast(text: string, ms = 2200): void {
     this.toastEl.textContent = text;
     this.toastEl.classList.add('show');
-    clearTimeout(this.toastTimer);
-    this.toastTimer = window.setTimeout(() => this.toastEl.classList.remove('show'), ms);
+    const token = ++this.toastTimer;
+    timers.after(ms, () => token === this.toastTimer && this.toastEl.classList.remove('show'));
   }
 
   subtitle(msg: RadioMessage, speaker: string, color: string): void {
@@ -88,8 +89,8 @@ export class Hud {
     this.subs.appendChild(d);
     while (this.subs.children.length > 4) this.subs.firstElementChild!.remove();
     const life = 3500 + msg.text.length * 55;
-    setTimeout(() => d.classList.add('fade'), life);
-    setTimeout(() => d.remove(), life + 900);
+    timers.after(life, () => d.classList.add('fade'));
+    timers.after(life + 900, () => d.remove());
   }
 
   // ------------------------------------------------------------- overlays

@@ -1,3 +1,4 @@
+import { timers } from '../core/Timers';
 import { COMMANDS, type CommandId } from '../sim/npc/Commands';
 import type { RadioMessage } from '../sim/radio/RadioSystem';
 import type { SimWorld } from '../sim/SimWorld';
@@ -70,7 +71,7 @@ export class RadioUI {
     const to = this.channelId;
     if (to !== 'all' && !this.sim.npc(to).alive) return false;
     this.onTransmit(to, cmd.id);
-    this.sentFlash = { cmd: cmd.id, until: performance.now() + 700 };
+    this.sentFlash = { cmd: cmd.id, until: timers.now() + 700 };
     this.flash(this.tx, 600);
     this.render();
     return true;
@@ -82,16 +83,16 @@ export class RadioUI {
     this.last = msg;
     if (msg.status === 'unknown') {
       this.flash(this.warn, 4000);
-      this.noiseUntil = performance.now() + 2500;
+      this.noiseUntil = timers.now() + 2500;
     } else this.flash(this.rx, 500 + msg.text.length * 20);
-    if (msg.signal < 0.9) this.noiseUntil = Math.max(this.noiseUntil, performance.now() + 900);
+    if (msg.signal < 0.9) this.noiseUntil = Math.max(this.noiseUntil, timers.now() + 900);
     this.render();
   }
 
   render(): void {
     const s = this.sim;
     const ch = this.channelId;
-    const now = performance.now();
+    const now = timers.now();
     this.lcd.classList.toggle('noise', now < this.noiseUntil);
     const header = ch === 'all' ? 'CH 0 · ALL STATIONS' : `CH ${this.channel} · ${s.npc(ch).name.toUpperCase()}`;
     const mySignal = s.radio.signalFor(s.player.room);
@@ -120,6 +121,6 @@ export class RadioUI {
 
   private flash(led: HTMLElement, ms: number): void {
     led.classList.add('on');
-    setTimeout(() => led.classList.remove('on'), ms);
+    timers.after(ms, () => led.classList.remove('on'));
   }
 }
