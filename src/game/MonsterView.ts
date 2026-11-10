@@ -10,6 +10,9 @@ import { timers } from '../core/Timers';
  * Motion is never smooth: it holds still, then twitches.
  */
 export class MonsterView {
+  /** Head position relative to the root (torso pitched forward 0.28 rad). */
+  static readonly HEAD_HEIGHT = 1.3 + Math.cos(0.28) * 1.1 - Math.sin(0.28) * 0.12;
+  static readonly HEAD_FORWARD = Math.sin(0.28) * 1.1 + Math.cos(0.28) * 0.12;
   readonly root = new THREE.Group();
   private head: THREE.Group;
   private arms: THREE.Group[] = [];
@@ -119,7 +122,7 @@ export class MonsterView {
     mouth.position.set(0, -0.07, 0.115);
     this.head.add(mouth);
 
-    this.mouthLight = new THREE.PointLight(0xff5530, 0, 2, 2);
+    this.mouthLight = new THREE.PointLight(0xdfe6ff, 0, 1.5, 2);
     this.mouthLight.position.set(0, 0, 0.4);
     this.head.add(this.mouthLight);
 
@@ -146,7 +149,7 @@ export class MonsterView {
   /** Jumpscare pose: arms raised toward the camera, mouth lit. */
   set lunging(on: boolean) {
     for (const [i, arm] of this.arms.entries()) arm.rotation.x = on ? -1.3 - i * 0.2 : 0;
-    this.mouthLight.intensity = on ? 3 : 0;
+    this.mouthLight.intensity = on ? 0.7 : 0;
   }
 
   update(): void {

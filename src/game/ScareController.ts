@@ -138,12 +138,15 @@ export class ScareController {
       }
       case 'lunge': {
         // Pin it to the camera, rushing in for ~0.9 s.
+        // The face rushes from ~1.2 m to ~0.4 m in front of the eyes.
         const k = Math.min(1, act.t / 0.18);
-        const dist = 1.1 - k * 0.55;
-        const p = cam.position.clone().addScaledVector(new THREE.Vector3(this.fwd.x, 0, this.fwd.z).normalize(), dist);
+        const scale = 1.05 + k * 0.1;
+        const faceDist = 1.2 - k * 0.8;
+        const flat = new THREE.Vector3(this.fwd.x, 0, this.fwd.z).normalize();
+        const p = cam.position.clone().addScaledVector(flat, faceDist + MonsterView.HEAD_FORWARD * scale);
         this.monster.place(p.x, p.z, cam.position.x, cam.position.z);
-        this.monster.root.position.y = cam.position.y - 2.3;
-        this.monster.root.scale.setScalar(1.05 + k * 0.1);
+        this.monster.root.position.y = cam.position.y - MonsterView.HEAD_HEIGHT * scale + 0.06;
+        this.monster.root.scale.setScalar(scale);
         this.monster.lunging = true;
         if (act.t > 0.9) {
           this.hud.flash('#000000', 260, 1);
