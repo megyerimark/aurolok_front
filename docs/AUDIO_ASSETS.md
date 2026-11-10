@@ -25,3 +25,11 @@ sample is used automatically; the synth stays as the fallback.
 | `radio.voice_bed` | **Voice lines** | Placeholder murmur. Real lines should be recorded per dialogue line (see `src/sim/npc/DialogueLines.ts`; roughly 150 lines across 4 characters + shared). Process through the radio chain (band-pass + soft clip) at runtime, not baked. |
 | `radio.unknown` | THE LISTENER transmission | Later stages need voice-imitation variants of each character and of the player. |
 | `player.breath` | Exhausted breathing loop | Driven by stamina. |
+| `amb.dread` | Dread bed loop: sub drone, beating low tones, moaning vent wind | Gain follows THE LISTENER's dread value (darkness, radio use, panic). |
+| `scare.stinger` | Jumpscare hit: dissonant cluster + impact + sub drop | Played on every lunge. |
+| `scare.scream` | THE LISTENER's scream, inhuman and layered | Lunge. |
+| `scare.whisper` | Close whisper/breath behind the player, positional | If the player turns around in time, the figure is there. |
+| `scare.footsteps` | Heavy, uneven footsteps with a drag | Positional, close but out of sight. |
+| `scare.heartbeat` | Single heartbeat | Repeats faster as dread rises. |
+| `scare.lights_burst` | Fluorescent tubes bursting + buzz | Blackout scare. |
+| `scare.presence` | Low rising swell | When the figure appears down a corridor. |

@@ -12,6 +12,7 @@ import { buildLevel, type DoorView, type Level } from './LevelBuilder';
 import { LightPool } from './LightPool';
 import { NpcView } from './NpcView';
 import { PlayerController } from './PlayerController';
+import { ScareController } from './ScareController';
 import { Renderer } from './Renderer';
 import { dustSprite } from './textures';
 
@@ -49,6 +50,8 @@ export class Game {
   private time = 0;
   private interference = 0;
   private dust!: THREE.Points;
+  private scares: ScareController;
+  private heartbeatIn = 0;
   private lightPool: LightPool;
   private lightTargets = new Map<RoomId, { main: number; emergency: number }>();
   private powerFlicker = 0;
@@ -91,6 +94,7 @@ export class Game {
     this.renderer = new Renderer(container, this.scene, this.player.camera);
     this.audio = new AudioManager();
     this.hud = new Hud(ui);
+    this.scares = new ScareController(this.scene, sim, this.player, this.audio, this.hud);
     this.radio = new RadioUI(ui, sim);
     this.radio.onTransmit = (to, cmd) => this.transmit(to, cmd);
 
@@ -152,6 +156,7 @@ export class Game {
     });
     sim.player.pos = this.player.position;
     sim.player.room = sim.map.roomAtWorld(sim.player.pos);
+    sim.player.yaw = this.player.yaw;
     sim.update(dt);
 
     // Interaction
@@ -162,6 +167,21 @@ export class Game {
 
     // Breathing when out of stamina
     this.audio.setBreathing(Math.max(0, 0.6 - this.player.stamina) * 1.6);
+
+    // THE LISTENER: scares, camera shake, dread soundscape, heartbeat.
+    this.scares.update(dt, sim.player.flashlightOn);
+    const sh = this.scares.shake;
+    if (sh > 0) {
+      this.player.camera.rotation.x += (Math.random() - 0.5) * sh * 0.07;
+      this.player.camera.rotation.y += (Math.random() - 0.5) * sh * 0.07;
+    }
+    const dread = sim.listener.dread;
+    this.audio.setDread(dread);
+    this.heartbeatIn -= dt;
+    if (dread > 0.45 && this.heartbeatIn <= 0) {
+      this.heartbeatIn = 60 / (62 + dread * 70);
+      this.audio.play('scare.heartbeat', { gain: (dread - 0.4) * 1.6 });
+    }
     this.audio.updateListener(this.player.camera);
 
     this.radioTick -= dt;
@@ -214,6 +234,7 @@ export class Game {
     const p = sim.player;
     let fl = p.flashlightOn ? 38 * (0.35 + 0.65 * Math.min(1, p.charge * 2.5)) : 0;
     if (p.flashlightOn && p.charge < 0.15 && Math.random() < 0.08) fl *= 0.2;
+    if (this.scares.flashlightFail > 0) fl *= Math.random() < 0.55 ? 0 : 0.25;
     this.flashlight.intensity += (fl - this.flashlight.intensity) * Math.min(1, dt * 25);
 
     // NPCs
@@ -240,6 +261,9 @@ export class Game {
     const base = (1 - sim.radio.signalFor(p.room)) * 0.25;
     this.interference = Math.max(base, this.interference - dt * 0.5);
     this.renderer.interference = this.interference;
+    this.interference = Math.max(this.interference, this.scares.interferencePulse);
+    this.renderer.interference = this.interference;
+    this.renderer.dread = sim.listener.dread;
     this.lightPool.update(this.player.camera);
   }
 
@@ -345,6 +369,13 @@ export class Game {
     });
     bus.on('radioMessage', (m) => {
       this.radio.receive(m);
+      if (m.from === 'player' && !m.authentic) {
+        // Your own voice, saying something you never said.
+        this.hud.subtitle(m, 'You', '#e8e2d0');
+        this.audio.play('radio.squelch', { open: true, gain: 0.7 });
+        this.audio.play('radio.voice_bed', { duration: 0.4 + m.text.length * 0.045 });
+        return;
+      }
       if (m.from === 'player') return;
       const npc = this.sim.npcs.find((n) => n.id === m.from);
       const name = npc?.name ?? (m.from === 'unknown' ? '???' : m.from);
@@ -576,6 +607,10 @@ export class Game {
   }
 
   /** Test hook: advance the simulation by fixed steps, independent of frame rate. */
+  debugScare(kind: Parameters<ScareController['force']>[0]): void {
+    this.scares.force(kind);
+  }
+
   debugAdvance(seconds: number): void {
     for (let t = 0; t < seconds; t += 0.05) this.sim.update(0.05);
   }

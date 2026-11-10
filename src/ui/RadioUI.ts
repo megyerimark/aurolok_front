@@ -79,7 +79,7 @@ export class RadioUI {
 
   /** A message arrived on the net. */
   receive(msg: RadioMessage): void {
-    if (msg.from === 'player') return;
+    if (msg.from === 'player' && msg.authentic) return;
     this.last = msg;
     if (msg.status === 'unknown') {
       this.flash(this.warn, 4000);
@@ -114,7 +114,7 @@ export class RadioUI {
       : '';
     const last = this.last;
     const lastLine = last
-      ? `<div class="sep"></div><div class="last">${last.status === 'unknown' ? '<span class="flag" style="color:var(--bad)">UNREG TX</span> ' : ''}${last.from === 'unknown' ? '???' : last.from.toUpperCase()}: ${last.text}</div>`
+      ? `<div class="sep"></div><div class="last">${last.status === 'unknown' ? '<span class="flag" style="color:var(--bad)">UNREG TX</span> ' : ''}${last.from === 'unknown' ? '???' : last.from === 'player' ? 'YOU' : last.from.toUpperCase()}: ${last.text}</div>`
       : '';
     this.lcd.innerHTML = `<div class="row"><span class="ch">${header}</span><span class="bars dim">${bars(mySignal)}</span></div><div class="sep"></div>${body}${cmds}${lastLine}`;
   }

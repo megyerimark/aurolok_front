@@ -12,6 +12,7 @@ import { PlayerState } from './PlayerState';
 import { RadioSystem } from './radio/RadioSystem';
 import type { SimEvents } from './SimEvents';
 import { StoryDirector } from './story/StoryDirector';
+import { Listener } from './entity/Listener';
 
 export interface SimOptions {
   seed?: number;
@@ -19,6 +20,8 @@ export interface SimOptions {
   story?: boolean;
   /** Disable random facility noises (tests). */
   ambientNoise?: boolean;
+  /** Disable THE LISTENER's scares (tests). Dread is still tracked. */
+  listener?: boolean;
 }
 
 const DOOR_AUTO_CLOSE = 7;
@@ -39,6 +42,7 @@ export class SimWorld implements NpcWorld {
   readonly npcs: NpcAgent[];
   readonly player = new PlayerState();
   readonly story: StoryDirector;
+  readonly listener: Listener;
   readonly seed: number;
   time = 0;
 
@@ -58,6 +62,7 @@ export class SimWorld implements NpcWorld {
     this.player.room = 'control';
     this.npcs = PERSONALITIES.map((p) => new NpcAgent(p, this, this.startPosFor(p.startRoom)));
     this.story = new StoryDirector(this);
+    this.listener = new Listener(this, opts.listener ?? true);
     this.storyEnabled = opts.story ?? true;
     this.ambientEnabled = opts.ambientNoise ?? true;
     this.nextAmbient = this.rng.range(20, 35);
@@ -125,6 +130,7 @@ export class SimWorld implements NpcWorld {
     this.radio.update(dt);
     this.player.update(dt);
     for (const n of this.npcs) n.update(dt);
+    this.listener.update(dt);
     this.autoCloseDoors();
     if (this.ambientEnabled) this.ambient();
     if (this.storyEnabled) {

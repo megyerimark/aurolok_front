@@ -86,6 +86,12 @@ export class Renderer {
     window.addEventListener('resize', () => this.resize(camera as THREE.PerspectiveCamera));
   }
 
+  /** 0..1: tighter vignette and heavier grain as dread rises. */
+  set dread(v: number) {
+    this.grade.uniforms.vignette.value = 0.9 + v * 0.45;
+    this.grade.uniforms.grain.value = 0.055 + v * 0.05;
+  }
+
   set interference(v: number) {
     this.grade.uniforms.interference.value = v;
   }

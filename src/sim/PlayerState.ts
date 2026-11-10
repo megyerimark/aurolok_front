@@ -9,6 +9,8 @@ export class PlayerState {
   /** Flashlight charge, 0..1. */
   charge = 1;
   flashlightOn = false;
+  /** Camera yaw (radians). 0 = facing -Z. */
+  yaw = 0;
 
   /** Seconds of light per full battery. Tuned so batteries matter during the outage. */
   static readonly DRAIN_SECONDS = 240;

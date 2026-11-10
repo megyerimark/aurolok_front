@@ -1,6 +1,7 @@
 import type { RoomId, Vec2 } from './facility/FacilityMap';
 import type { RadioMessage } from './radio/RadioSystem';
 import type { NpcStateName } from './npc/NpcAgent';
+import type { ScareEvent } from './entity/Listener';
 
 /** Every fact the simulation publishes. Presentation layers subscribe to these. */
 export interface SimEvents {
@@ -14,4 +15,6 @@ export interface SimEvents {
   npcStateChanged: { npcId: string; from: NpcStateName; to: NpcStateName };
   objectiveChanged: { id: string; text: string };
   shiftEnded: { reason: string };
+  /** THE LISTENER shows itself. */
+  scare: ScareEvent;
 }

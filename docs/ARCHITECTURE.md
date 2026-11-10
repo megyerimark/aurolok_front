@@ -119,7 +119,7 @@ Unit tests check the design promises statistically across hundreds of seeds. For
 | 1 Audit & architecture | ✅ | This document. |
 | 2 Playable foundation | ✅ | FPS controller, 7-area facility, interaction, doors, keycard, flashlight + batteries, radio handset UI, command selection. |
 | 3 NPC system | ✅ first pass (pulled forward so the radio has someone to talk to) | 4 personalities, utility interpreter, FSM, fear/stress/trust, memory, autonomy, panic/hide/recover, contextual dialogue, face-to-face orders. |
-| 4 THE LISTENER | ⏳ seeded | Stage-1 interference transmission exists; `authentic` flag and `RadioSystem.interference` are the hooks. Next: repeat heard orders → fake orders to NPCs (Lucas can catch them) → voice imitation → sightings → direct contact. React to radio usage, noise, panic, power, cameras. |
+| 4 THE LISTENER | 🟡 first pass | `sim/entity/Listener.ts`: attention + dread model and a scare director (hazard rate scaled by dread; cooldowns; phase gating; no repeats). Scare kinds: footsteps, whisper-behind, apparition, lunge (jumpscare), blackout, door slam, false teammate voice, false order in the player's own voice (NPCs may obey it). Presentation: `MonsterView` (the creature), `ScareController`. Still to do: voice imitation, camera-based sightings, direct contact with the player, interference driven by the entity. |
 | 5 Chaos system | ⏳ | `DynamicEventManager` on top of the bus (ambient noises and the outage already exist): priorities, cooldowns, prerequisites, intensity budget, chained events. |
 | 6 First complete demo | ⏳ | Chapters 2–5, climax, ≥2 endings, full incident report (the report exists already). |
 | 7 Polish | ⏳ | Assets, audio, animation, camera system, save system, settings menu, Electron `.exe`, performance. |

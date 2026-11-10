@@ -27,6 +27,14 @@ export const AUDIO_CUES = {
   'radio.voice_bed': { file: null as string | null, note: 'Stand-in for recorded voice lines (see dialogue ids)' },
   'radio.unknown': { file: null as string | null, note: 'THE LISTENER: unidentified transmission' },
   'player.breath': { file: null as string | null, note: 'Exhausted breathing' },
+  'amb.dread': { file: null as string | null, note: 'Dread bed: sub drone, beating tones, wind in the vents (loop, gain = dread)' },
+  'scare.stinger': { file: null as string | null, note: 'Jumpscare stinger: dissonant orchestral/metal hit' },
+  'scare.scream': { file: null as string | null, note: 'THE LISTENER scream (inhuman, layered)' },
+  'scare.whisper': { file: null as string | null, note: 'Close whisper / breath behind the player, positional' },
+  'scare.footsteps': { file: null as string | null, note: 'Heavy, uneven entity footsteps with drag, positional' },
+  'scare.heartbeat': { file: null as string | null, note: 'Player heartbeat (one beat), driven by dread' },
+  'scare.lights_burst': { file: null as string | null, note: 'Fluorescent tubes bursting + electrical buzz' },
+  'scare.presence': { file: null as string | null, note: 'Low rising swell when the figure is seen' },
 } as const;
 export type CueId = keyof typeof AUDIO_CUES;
 
@@ -41,6 +49,8 @@ export class AudioManager {
   private roomTone: GainNode | null = null;
   private generator: { gain: GainNode } | null = null;
   private breath: GainNode | null = null;
+  private dread: GainNode | null = null;
+  private dreadFilter: BiquadFilterNode | null = null;
 
   constructor() {
     this.ctx = new AudioContext();
@@ -139,6 +149,44 @@ export class AudioManager {
     bbp.Q.value = 0.8;
     bn.connect(bbp).connect(br).connect(this.sfx);
     this.breath = br;
+
+    // Dread bed: inaudible at 0, oppressive at 1.
+    const dg = this.ctx.createGain();
+    dg.gain.value = 0;
+    dg.connect(this.amb);
+    for (const [f, g] of [[36, 0.22], [36.6, 0.2], [54.9, 0.08], [73.4, 0.05], [77.8, 0.05]] as const) {
+      const o = this.ctx.createOscillator();
+      o.frequency.value = f;
+      const og = this.ctx.createGain();
+      og.gain.value = g;
+      o.connect(og).connect(dg);
+      o.start();
+    }
+    const wind = this.loopNoise();
+    const wf = this.ctx.createBiquadFilter();
+    wf.type = 'bandpass';
+    wf.frequency.value = 300;
+    wf.Q.value = 4;
+    const wg = this.ctx.createGain();
+    wg.gain.value = 0.5;
+    wind.connect(wf).connect(wg).connect(dg);
+    // Slow LFO sweeping the "wind" so it moans.
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 0.07;
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.value = 180;
+    lfo.connect(lfoGain).connect(wf.frequency);
+    lfo.start();
+    this.dread = dg;
+    this.dreadFilter = wf;
+  }
+
+  /** 0..1. The dread bed swells and the "wind" opens up as dread rises. */
+  setDread(level: number): void {
+    if (!this.dread || !this.dreadFilter) return;
+    const t = this.ctx.currentTime;
+    this.dread.gain.setTargetAtTime(Math.pow(level, 1.4) * 0.55, t, 0.8);
+    this.dreadFilter.Q.setTargetAtTime(2 + level * 10, t, 1);
   }
 
   /** Power state drives the hum. Losing power = sudden silence. */
@@ -324,6 +372,136 @@ export class AudioManager {
           o.stop(t + dur + 0.1);
         }
         this.noiseBurst(out, t, dur, 'bandpass', 1400, 0.4, 0.4, 0.4, true);
+        break;
+      }
+      case 'scare.stinger': {
+        // Dissonant cluster + noise hit + sub drop. Loud on purpose.
+        const lp = c.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(9000, t);
+        lp.frequency.exponentialRampToValueAtTime(400, t + 1.6);
+        lp.connect(out);
+        for (const f of [233, 247, 262, 277, 311, 466, 494, 698]) {
+          const o = c.createOscillator();
+          o.type = 'sawtooth';
+          o.frequency.setValueAtTime(f, t);
+          o.frequency.linearRampToValueAtTime(f * 0.94, t + 1.8);
+          const g = c.createGain();
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(0.09, t + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + 1.9);
+          o.connect(g).connect(lp);
+          o.start(t);
+          o.stop(t + 2);
+        }
+        this.noiseBurst(out, t, 0.35, 'lowpass', 5000, 1.2, 0.7);
+        const sub = c.createOscillator();
+        sub.frequency.setValueAtTime(110, t);
+        sub.frequency.exponentialRampToValueAtTime(28, t + 1.2);
+        const sg = c.createGain();
+        sg.gain.setValueAtTime(0.9, t);
+        sg.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+        sub.connect(sg).connect(out);
+        sub.start(t);
+        sub.stop(t + 1.6);
+        break;
+      }
+      case 'scare.scream': {
+        const dur = opts.duration ?? 1.3;
+        const shaper = c.createWaveShaper();
+        const curve = new Float32Array(512);
+        for (let i = 0; i < 512; i++) curve[i] = Math.tanh(((i / 511) * 2 - 1) * 6);
+        shaper.curve = curve;
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.5, t + 0.04);
+        g.gain.setValueAtTime(0.5, t + dur * 0.6);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        shaper.connect(g).connect(out);
+        for (const [base, form] of [[820, 1100], [1240, 2600], [610, 900]] as const) {
+          const o = c.createOscillator();
+          o.type = 'sawtooth';
+          o.frequency.setValueAtTime(base * 0.8, t);
+          o.frequency.exponentialRampToValueAtTime(base * 1.25, t + dur * 0.3);
+          o.frequency.exponentialRampToValueAtTime(base * 0.55, t + dur);
+          const vib = c.createOscillator();
+          vib.frequency.value = 23 + Math.random() * 9;
+          const vg = c.createGain();
+          vg.gain.value = base * 0.06;
+          vib.connect(vg).connect(o.frequency);
+          const bp = c.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.frequency.value = form;
+          bp.Q.value = 3;
+          const og = c.createGain();
+          og.gain.value = 0.25;
+          o.connect(bp).connect(og).connect(shaper);
+          o.start(t);
+          vib.start(t);
+          o.stop(t + dur + 0.05);
+          vib.stop(t + dur + 0.05);
+        }
+        this.noiseBurst(shaper, t, dur, 'bandpass', 3000, 0.25, 1, 0.03);
+        break;
+      }
+      case 'scare.whisper': {
+        const dur = opts.duration ?? 2.5;
+        const src = this.loopNoise();
+        const bp = c.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 3200;
+        bp.Q.value = 1.5;
+        const g = c.createGain();
+        g.gain.value = 0;
+        // Syllables: fast, uneven, hissing.
+        for (let k = 0; k * 0.11 < dur; k++) {
+          const at = t + k * 0.11 + Math.random() * 0.05;
+          g.gain.setTargetAtTime(Math.random() < 0.25 ? 0 : 0.2 + Math.random() * 0.25, at, 0.02);
+          bp.frequency.setTargetAtTime(2200 + Math.random() * 3000, at, 0.02);
+        }
+        g.gain.setTargetAtTime(0, t + dur, 0.05);
+        src.connect(bp).connect(g).connect(out);
+        src.stop(t + dur + 0.4);
+        // A slow wet inhale underneath.
+        this.noiseBurst(out, t + 0.2, dur * 0.6, 'lowpass', 700, 0.3, 0.8, dur * 0.5);
+        break;
+      }
+      case 'scare.footsteps': {
+        // Heavy, uneven: step... step-step... drag.
+        let at = t;
+        for (let k = 0; k < 5; k++) {
+          this.tone(out, at, 'sine', 48 + Math.random() * 10, 0.4, 0.7);
+          this.noiseBurst(out, at, 0.09, 'lowpass', 500, 0.6, 1);
+          if (k % 2) this.noiseBurst(out, at + 0.12, 0.35, 'bandpass', 1400, 0.12, 2, 0.1); // drag
+          at += k === 1 ? 0.28 : 0.55 + Math.random() * 0.4;
+        }
+        break;
+      }
+      case 'scare.heartbeat':
+        this.tone(out, t, 'sine', 52, 0.16, 0.6);
+        this.tone(out, t + 0.2, 'sine', 46, 0.2, 0.45);
+        break;
+      case 'scare.lights_burst':
+        for (let k = 0; k < 3; k++) this.noiseBurst(out, t + k * 0.07, 0.08, 'highpass', 2500, 1, 0.8);
+        this.tone(out, t, 'square', 120, 1.2, 0.08);
+        break;
+      case 'scare.presence': {
+        const o = c.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(40, t);
+        o.frequency.exponentialRampToValueAtTime(62, t + 2.5);
+        const lp = c.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(120, t);
+        lp.frequency.exponentialRampToValueAtTime(900, t + 2.5);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.35, t + 2.3);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 3);
+        o.connect(lp).connect(g).connect(out);
+        o.start(t);
+        o.stop(t + 3.1);
+        this.noiseBurst(out, t, 2.6, 'bandpass', 1800, 0.12, 1, 2.4, true);
         break;
       }
       default:

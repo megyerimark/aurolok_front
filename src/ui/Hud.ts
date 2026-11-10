@@ -34,6 +34,7 @@ export class Hud {
   private subs: HTMLElement;
   private toastEl: HTMLElement;
   private overlay: HTMLElement;
+  private flashEl: HTMLElement;
   private objectiveTimer = 0;
   private toastTimer = 0;
 
@@ -45,6 +46,7 @@ export class Hud {
     this.inventory = el('div', 'inventory', root);
     this.subs = el('div', 'subs', root);
     this.toastEl = el('div', 'toast', root);
+    this.flashEl = el('div', 'flash', root);
     this.overlay = el('div', 'screen hidden', root);
   }
 
@@ -71,6 +73,17 @@ export class Hud {
     this.inventory.innerHTML =
       `<div><div class="battery${low}"><div style="width:${Math.round(charge * 100)}%"></div></div><div style="margin-top:4px">LIGHT ${batteries > 0 ? `· ${batteries} SPARE` : ''}</div></div>` +
       (keycard ? '<div class="keycard">SECTOR R KEYCARD</div>' : '');
+  }
+
+  /** Full-screen flash (jumpscares). */
+  flash(color: string, ms: number, opacity = 1): void {
+    const f = this.flashEl;
+    f.style.transition = 'none';
+    f.style.background = color;
+    f.style.opacity = String(opacity);
+    void f.offsetWidth;
+    f.style.transition = `opacity ${ms}ms ease-out`;
+    f.style.opacity = '0';
   }
 
   toast(text: string, ms = 2200): void {
